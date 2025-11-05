@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Numbering today's date</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>STUDENT's VIRTUAL ASSITANT</h1>
+    <div class="chat-window">
+      <div class="message user-message">
+        <div class="avatar">BOT</div>
+        <div class="bubble">How can I help you today?</div>
+      </div>
+
+      <div class="message bot-message">
+        <div class="avatar bot-avatar">AI</div>
+        <div class="bubble" id="bot-response"></div>
+      </div>
+    </div>
+
+    <form id="chat-form" class="chat-form">
+      <input type="text" id="user-input" placeholder="How can I help you today?" autocomplete="off" required />
+      <button type="submit" class="send-button">↑</button>
+    </form>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+strenum
+sentence_transformers
+langchain_docling
+pydantic
+fastapi
+uvicorn
+langchain_docling
+langchain_huggingface
+qdrant_client
+docling

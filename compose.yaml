@@ -1,0 +1,15 @@
+services:
+  qrandt_database:
+    image: qdrant/qdrant
+    container_name: confident_neumann
+    restart: always
+    
+  web:
+    image: 6590523f1d94
+    container_name: competent_brown
+    ports:
+      - 8000:8000
+      - 8051:8051
+    restart: always
+    depends_on:
+      - qrandt_database
