@@ -1,13 +1,34 @@
-strenum
-sentence_transformers
-langchain_docling
-pydantic
+# Core dependencies
 fastapi
 uvicorn
-langchain_docling
-langchain_huggingface
-qdrant_client
-docling
-agentscope[full]
-google-generativeai
+pydantic
+python-dotenv
+
+# LangChain & LangGraph
+langgraph
+langchain
+langchain-openai
+langchain-community
+langchain-qdrant
+langchain-google-genai
+
+# Vector store & embeddings
+qdrant-client
+sentence-transformers
+
+# Database
 mysql-connector-python
+
+# Document processing
+docling
+langchain_docling
+
+# Web search
+google-search-results
+
+# AI models
+openai
+google-generativeai
+
+# Utilities
+strenum

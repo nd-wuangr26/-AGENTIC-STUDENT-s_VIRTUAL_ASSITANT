@@ -167,6 +167,7 @@ class QdrantService(VectorStore):
         return [RetrivalResuult(scorce=result.score, payload=result.payload)
                 for result in results
         ]
+        
     async def batch_retrieve(self, embeddings: List[List[float]], top_k: int = 3) -> List[List[RetrivalResuult]]:
         for emb in embeddings:
             self.validate_embeding(emb)

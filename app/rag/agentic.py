@@ -1,336 +1,524 @@
+"""
+LangGraph-based Agentic RAG System
+Implements multi-agent system with routing, RAG, MySQL, and Web Search capabilities
+"""
 from pathlib import Path
 import sys
 
-# Lên 3 cấp từ file hiện tại để đến thư mục chứa "app"
+# Add project root to path
 project_root = Path(__file__).resolve().parents[3]
-
-# Thêm vào sys.path nếu chưa có
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-
-
-import asyncio
-import json
-from agentscope.agent import ReActAgent
-from agentscope.message import Msg
-from agentscope.model import OpenAIChatModel
-from agentscope.rag import (
-    TextReader,
-    SimpleKnowledge,
-    QdrantStore,
-    Document,
-    ImageReader,
-)
-from agentscope.embedding import OpenAITextEmbedding
-from agentscope.formatter import OpenAIChatFormatter
-from agentscope.tool import Toolkit
-from app.core.config.config import *
-from app.core.embeding.embeddings import Embedding
-from app.core.schenma.reponse_schenma import QueryPayload, QuestionRequest
-from app.core.CRUD_Mysql.base_mysql import *
-from fastapi import APIRouter
-from dotenv import load_dotenv
 import os
+import json
+import openai
+from typing import TypedDict, Annotated, Literal
+from dotenv import load_dotenv
+
+# LangGraph imports
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
+
+# LangChain imports
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import tool
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+
+# FastAPI
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+# Local imports
+from app.core.mcp.mysql_mcp_server import get_mcp_server
+from app.core.config.config import EMBEDDING_DIMS
+
+# Schema imports
+from app.core.schenma.reponse_schenma import *
+
+# Qdrant imports
+from app.db.qdrant_service import QdrantService
+
+
 load_dotenv()
 
-OPENAI_KEY_API = os.getenv("OPENAI_API_KEY")
-qdrant_url = "http://localhost:6333"
-LLM_KEY = os.getenv('Gemini_api_key')
+# Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
+# Initialize router
 app = APIRouter()
 
 
+# ============================================================================
+# State Definition
+# ============================================================================
 
-OpenAI_embedding = OpenAITextEmbedding(
-    api_key=OPENAI_KEY_API,
-    model_name="text-embedding-3-small",
+class AgentState(TypedDict):
+    """State for the agent graph"""
+    messages: list
+    question: str
+    route: str  # 'rag', 'database', 'web_search'
+    context: str
+    answer: str
+    error: str
+
+
+# ============================================================================
+# Tools Definition
+# ============================================================================
+
+# MySQL Tools via MCP
+mcp_server = get_mcp_server()
+
+@tool
+def list_available_rooms() -> dict:
+    """List all available dormitory rooms with vacancy information"""
+    return mcp_server.list_available_rooms()
+
+@tool
+def add_student(mssv: str, ten: str, nam_sinh: int, room_id: str) -> dict:
+    """
+    Add a new student to a dormitory room
+    
+    Args:
+        mssv: Student ID
+        ten: Student name
+        nam_sinh: Birth year
+        room_id: Room ID (e.g., A100, B201)
+    """
+    return mcp_server.add_student(mssv, ten, nam_sinh, room_id)
+
+@tool
+def get_student_info(mssv: str) -> dict:
+    """
+    Get detailed information about a student by their ID
+    
+    Args:
+        mssv: Student ID
+    """
+    return mcp_server.get_student_info(mssv)
+
+@tool
+def get_room_info(room_id: str) -> dict:
+    """
+    Get room information and list of students in the room
+    
+    Args:
+        room_id: Room ID (e.g., A100, B201)
+    """
+    return mcp_server.get_room_info(room_id)
+
+@tool
+def remove_student(mssv: str) -> dict:
+    """
+    Remove a student from the dormitory
+    
+    Args:
+        mssv: Student ID
+    """
+    return mcp_server.remove_student(mssv)
+
+# Web Search Tool
+@tool
+def web_search(query: str) -> str:
+    """
+    Search the web using Google Search via Serper API for current information
+    
+    Args:
+        query: Search query
+    """
+    try:
+        if not SERPER_API_KEY:
+            return "Web search unavailable: SERPER_API_KEY not configured"
+        
+        search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY)
+        results = search.run(query)
+        return results
+    except Exception as e:
+        return f"Web search failed: {str(e)}"
+
+
+# Database tools list
+database_tools = [
+    list_available_rooms,
+    add_student,
+    get_student_info,
+    get_room_info,
+    remove_student
+]
+
+# Web search tools list
+web_search_tools = [web_search]
+
+
+# ============================================================================
+# LLM Setup
+# ============================================================================
+
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0,
+    api_key=OPENAI_API_KEY
 )
 
-# Shared chat model/formatter for agents
-chat_model = OpenAIChatModel(
-    api_key=OPENAI_KEY_API,
-    model_name="gpt-4o-mini",
-)
-chat_formatter = OpenAIChatFormatter()
+# LLM with database tools
+llm_with_db_tools = llm.bind_tools(database_tools)
 
-# ---------------------------
-# MySQL toolset (MCP-style tools)
-# ---------------------------
-
-def build_mysql_toolkit() -> Toolkit:
-    return Toolkit.from_functions(
-        [
-            tool_add_student,
-            tool_update_booking,
-            tool_remove_student,
-            tool_get_student_info,
-            tool_list_available_rooms,
-        ],
-        descriptions={
-            "tool_add_student": "Create a dorm booking: args (student_id:int, room_id:int, start_date:str 'YYYY-MM-DD', end_date:str 'YYYY-MM-DD').",
-            "tool_update_booking": "Update booking status: args (booking_id:int, status:str one of PENDING/APPROVED/REJECTED/CANCELLED).",
-            "tool_delete_booking": "Delete a booking by id: args (booking_id:int).",
-            "tool_get_booking": "Get booking details by id: args (booking_id:int).",
-            "tool_list_available_rooms": "List rooms that are currently available for booking.",
-        },
-    )
+# LLM with web search tools
+llm_with_web_tools = llm.bind_tools(web_search_tools)
 
 
-# ---------------------------
-# Agents
-# ---------------------------
-def make_rag_agent():
-    knowledge = SimpleKnowledge(
-        embedding_model=OpenAI_embedding,
-        embedding_store=QdrantStore(
-            location=qdrant_url,
-            collection_name="documents",
-            # OpenAI text-embedding-3-small returns 1536 dims
-            dimensions=EMBEDDING_DIMS,
-        ),
-    )
-    return ReActAgent(
-        name="RAG_AGENT",
-        sys_prompt="Bạn là trợ lý RAG. Trả lời chính xác dựa trên kho tri thức đã lập chỉ mục.",
-        model=chat_model,
-        formatter=chat_formatter,
-        knowledge=knowledge,
-    )
+# ============================================================================
+# Vector Store Setup (Using QdrantService)
+# ============================================================================
+# Note: QdrantService is now used directly in rag_agent function
 
 
-def make_db_agent():
-    toolkit = build_mysql_toolkit()
-    return ReActAgent(
-        name="DB_AGENT",
-        sys_prompt=(
-            "Bạn là trợ lý quản lý ký túc xá. "
-            "Sử dụng tool để thực hiện CRUD trên MySQL cho các yêu cầu: "
-            "tạo đặt phòng, cập nhật trạng thái, xóa, tra cứu đặt phòng và liệt kê phòng trống. "
-            "Luôn gọi tool phù hợp dựa trên yêu cầu của sinh viên và trả về kết quả ngắn gọn."
-        ),
-        model=chat_model,
-        formatter=chat_formatter,
-        tools=toolkit,
-    )
+# ============================================================================
+# Node Functions
+# ============================================================================
+
+def route_question(state: AgentState) -> AgentState:
+    """Route the question to appropriate agent"""
+    question = state["question"]
+    
+    # Use LLM to classify intent
+    router_prompt = f"""Classify the following question into ONE category:
+        - 'database': Questions about dormitory rooms, students, bookings, or any database operations
+        - 'rag': Questions about general knowledge, documents, or information from knowledge base
+        - 'web_search': Questions requiring current information, news, or real-time data
+
+        Question: {question}
+
+        Respond with ONLY one word: database, rag, or web_search"""
+    
+    messages = [SystemMessage(content=router_prompt)]
+    response = llm.invoke(messages)
+    
+    route = response.content.strip().lower()
+    
+    print(f"Routing decision: {route}")
+    
+    # Validate route
+    if route not in ['database', 'rag', 'web_search']:
+        route = 'rag'  # Default to RAG
+    
+    state["route"] = route
+    state["messages"] = [HumanMessage(content=question)]
+    
+    return state
 
 
-async def route_intent(user_text: str) -> str:
-    """
-    Return one of: 'RAG', 'DB'
-    """
-    import openai
-    client = openai.AsyncOpenAI(api_key=OPENAI_KEY_API)
+async def rag_agent(state: AgentState) -> AgentState:
+    """RAG agent - retrieves from knowledge base and generates answer"""
+    question = state["question"]
     
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Bạn là bộ định tuyến. Nhiệm vụ DUY NHẤT là phân loại yêu cầu.\n- Nếu câu hỏi tra cứu kiến thức, tài liệu, hoặc hỏi thông tin chung: trả về RAG\n- Nếu yêu cầu đặt phòng, kiểm tra phòng trống, hoặc thao tác dữ liệu: trả về DB\nKHÔNG trả lời câu hỏi. KHÔNG giải thích. CHỈ trả về đúng 1 từ: RAG hoặc DB."},
-            {"role": "user", "content": user_text}
-        ],
-        temperature=0
-    )
-    
-    text = response.choices[0].message.content.strip().upper()
-    if "DB" in text:
-        return "DB"
-    return "RAG"
-
-
-async def query_rag(user_text: str) -> str:
-    """Query RAG using Qdrant and OpenAI"""
-    import openai
-    client = openai.AsyncOpenAI(api_key=OPENAI_KEY_API)
-    
-    # Get embedding for query
-    emb_response = await client.embeddings.create(
-        input=user_text,
-        model="text-embedding-3-small",
-        dimensions=EMBEDDING_DIMS
-    )
-    query_embedding = emb_response.data[0].embedding
-    
-    # Search Qdrant
-    from qdrant_client import AsyncQdrantClient
-    qdrant = AsyncQdrantClient(url=qdrant_url)
-    
-    search_results = await qdrant.query_points(
-        collection_name="documents",
-        query=query_embedding,
-        limit=3
-    )
-    
-    # Build context from results
-    points = search_results.points if hasattr(search_results, 'points') else search_results
-    context = "\n\n".join([
-        f"[Tài liệu {i+1}]: {point.payload.get('context', point.payload.get('content', ''))}"
-        for i, point in enumerate(points)
-    ])
-    
-    # Generate answer
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": f"Bạn là trợ lý RAG. Trả lời chính xác dựa trên kho tri thức đã lập chỉ mục.\n\nTài liệu tham khảo:\n{context}"},
-            {"role": "user", "content": user_text}
-        ],
-        temperature=0.7
-    )
-    
-    return response.choices[0].message.content
-
-
-async def query_db(user_text: str) -> str:
-    """Query DB using tools"""
-    import openai
-    client = openai.AsyncOpenAI(api_key=OPENAI_KEY_API)
-    
-    # Define tools for OpenAI function calling
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "list_available_rooms",
-                "description": "Liệt kê các phòng ký túc xá còn chỗ trống",
-                "parameters": {"type": "object", "properties": {}}
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "add_student",
-                "description": "Thêm sinh viên vào phòng ký túc xá. Tự động kiểm tra phòng đã đủ người chưa.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "mssv": {"type": "string", "description": "Mã số sinh viên"},
-                        "ten": {"type": "string", "description": "Tên sinh viên"},
-                        "nam_sinh": {"type": "integer", "description": "Năm sinh"},
-                        "room_id": {"type": "string", "description": "Mã phòng (ví dụ: A100, B201)"}
-                    },
-                    "required": ["mssv", "ten", "nam_sinh", "room_id"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "get_student_info",
-                "description": "Lấy thông tin sinh viên theo MSSV",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "mssv": {"type": "string", "description": "Mã số sinh viên"}
-                    },
-                    "required": ["mssv"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "get_room_info",
-                "description": "Lấy thông tin phòng và danh sách sinh viên trong phòng",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "room_id": {"type": "string", "description": "Mã phòng (ví dụ: A100, B201)"}
-                    },
-                    "required": ["room_id"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "remove_student",
-                "description": "Xóa sinh viên khỏi ký túc xá",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "mssv": {"type": "string", "description": "Mã số sinh viên"}
-                    },
-                    "required": ["mssv"]
-                }
-            }
-        }
-    ]
-    
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Bạn là trợ lý quản lý ký túc xá. Sử dụng tool để thực hiện CRUD trên MySQL."},
-            {"role": "user", "content": user_text}
-        ],
-        tools=tools,
-        temperature=0
-    )
-    
-    message = response.choices[0].message
-    
-    # If tool call is requested
-    if message.tool_calls:
-        tool_call = message.tool_calls[0]
-        function_name = tool_call.function.name
+    try:
+        print(f"RAG Agent processing: {question}")
         
-        import json
-        arguments = json.loads(tool_call.function.arguments)
-        
-        # Execute the tool
-        try:
-            if function_name == "list_available_rooms":
-                from app.core.CRUD_Mysql.base_mysql import tool_list_available_rooms
-                result = tool_list_available_rooms()
-            elif function_name == "add_student":
-                from app.core.CRUD_Mysql.base_mysql import tool_add_student
-                result = tool_add_student(**arguments)
-            elif function_name == "get_student_info":
-                from app.core.CRUD_Mysql.base_mysql import tool_get_student_info
-                result = tool_get_student_info(**arguments)
-            elif function_name == "get_room_info":
-                from app.core.CRUD_Mysql.base_mysql import tool_get_room_info
-                result = tool_get_room_info(**arguments)
-            elif function_name == "remove_student":
-                from app.core.CRUD_Mysql.base_mysql import tool_remove_student
-                result = tool_remove_student(**arguments)
-            else:
-                result = {"error": "Unknown function"}
-        except Exception as e:
-            result = {
-                "error": f"Database error: {str(e)}",
-                "message": "MySQL connection failed. Please check your database configuration in .env file."
-            }
-        
-        from app.core.llm.geminiLLM import GeminiLLM
-        gemini_llm = GeminiLLM(api_key=os.getenv("GEMMINI_API_KEY"))
-        result = gemini_llm.generate_content(
-            f"Hãy trình bày kết quả sau đây một cách ngắn gọn và dễ hiểu cho sinh viên ký túc xá:\n{json.dumps(result, ensure_ascii=False)}"
+        # Initialize QdrantService
+        qdrant_service = QdrantService(
+            embedding_dims=EMBEDDING_DIMS,
+            host="localhost",
+            port=6333,
+            collection_name="documents"
         )
         
-        return result
+        print("QdrantService initialized")
+        
+        # Create embedding for the question using OpenAI
+        client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+        
+        emb_response = await client.embeddings.create(
+            input=question,
+            model="text-embedding-3-small",
+            dimensions=EMBEDDING_DIMS
+        )
+        query_embedding = emb_response.data[0].embedding
+        
+        print(f"Query embedding created (dim: {len(query_embedding)})")
+        
+        # Retrieve relevant documents using QdrantService
+        results = await qdrant_service.retrieve_points(
+            embedding=query_embedding
+        )
+        
+        print(f"Retrieved {len(results)} documents")
+        
+        # Build context from results
+        context = "\n\n".join([
+            f"[Document {i+1}] (Score: {result.scorce:.3f}):\n{result.payload.get('content', result.payload.get('context', ''))}"
+            for i, result in enumerate(results)
+        ])
+        
+        print("Context built successfully")
+        
+        state["context"] = context
+        
+        # Generate answer
+        rag_prompt = f"""You are a helpful RAG assistant. Answer the question based on the provided context.
+
+Context:
+{context}
+
+Question: {question}
+
+Provide a clear and concise answer in Vietnamese."""
+        
+        messages = [SystemMessage(content=rag_prompt)]
+        response = llm.invoke(messages)
+        
+        print("Answer generated successfully")
+        
+        state["answer"] = response.content
+        state["messages"].append(AIMessage(content=response.content))
+        
+    except Exception as e:
+        import traceback
+        error_msg = f"RAG error: {str(e)}"
+        print(error_msg)
+        print(traceback.format_exc())
+        state["error"] = error_msg
+        state["answer"] = "Xin lỗi, tôi không thể truy xuất thông tin từ cơ sở tri thức."
     
-    return message.content or "Không thể xử lý yêu cầu."
+    return state
+
+
+def database_agent(state: AgentState) -> AgentState:
+    """Database agent - handles MySQL operations via MCP"""
+    question = state["question"]
+    messages = state["messages"]
+    
+    try:
+        # System prompt for database agent
+        db_system_prompt = """You are a dormitory management assistant. Use the available tools to:
+        - List available rooms
+        - Add students to rooms
+        - Get student information
+        - Get room information
+        - Remove students
+
+        Always call the appropriate tool based on the user's request. Respond in Vietnamese."""
+        
+        messages_with_system = [SystemMessage(content=db_system_prompt)] + messages
+        
+        # Invoke LLM with tools
+        response = llm_with_db_tools.invoke(messages_with_system)
+        
+        # Check if tool calls are needed
+        if response.tool_calls:
+            # Execute tool calls
+            tool_results = []
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"]
+                tool_args = tool_call["args"]
+                
+                # Find and execute tool
+                tool_map = {t.name: t for t in database_tools}
+                if tool_name in tool_map:
+                    result = tool_map[tool_name].invoke(tool_args)
+                    tool_results.append(result)
+            
+            # Generate final response based on tool results
+            result_text = json.dumps(tool_results, ensure_ascii=False, indent=2)
+            
+            final_prompt = f"""Based on the tool execution results, provide a clear answer in Vietnamese.
+
+Tool Results:
+{result_text}
+
+User Question: {question}
+
+Provide a natural, conversational response."""
+            
+            final_response = llm.invoke([SystemMessage(content=final_prompt)])
+            state["answer"] = final_response.content
+        else:
+            state["answer"] = response.content
+        
+        state["messages"].append(AIMessage(content=state["answer"]))
+        
+    except Exception as e:
+        state["error"] = f"Database error: {str(e)}"
+        state["answer"] = "Xin lỗi, có lỗi khi truy cập cơ sở dữ liệu. Vui lòng kiểm tra kết nối MySQL."
+    
+    return state
+
+
+def web_search_agent(state: AgentState) -> AgentState:
+    """Web search agent - searches the web for current information"""
+    question = state["question"]
+    messages = state["messages"]
+    
+    try:
+        # System prompt for web search agent
+        search_system_prompt = """You are a web search assistant. Use the web_search tool to find current information.
+                                After getting search results, synthesize them into a clear answer in Vietnamese."""
+        
+        messages_with_system = [SystemMessage(content=search_system_prompt)] + messages
+        
+        # Invoke LLM with web search tool
+        response = llm_with_web_tools.invoke(messages_with_system)
+        
+        # Check if tool calls are needed
+        if response.tool_calls:
+            # Execute web search
+            search_results = []
+            for tool_call in response.tool_calls:
+                if tool_call["name"] == "web_search":
+                    query = tool_call["args"].get("query", question)
+                    result = web_search.invoke({"query": query})
+                    search_results.append(result)
+            
+            # Generate answer from search results
+            results_text = "\n\n".join(search_results)
+            
+            final_prompt = f"""Based on the web search results, answer the question in Vietnamese.
+
+                                Search Results:
+                                {results_text}
+
+                                Question: {question}
+
+                                Provide a clear, informative answer."""
+            
+            final_response = llm.invoke([SystemMessage(content=final_prompt)])
+            state["answer"] = final_response.content
+        else:
+            state["answer"] = response.content
+        
+        state["messages"].append(AIMessage(content=state["answer"]))
+        
+    except Exception as e:
+        state["error"] = f"Web search error: {str(e)}"
+        state["answer"] = "Xin lỗi, không thể tìm kiếm thông tin trên web."
+    
+    return state
+
+
+def route_to_agent(state: AgentState) -> Literal["rag_agent", "database_agent", "web_search_agent"]:
+    """Route to appropriate agent based on classification"""
+    route = state.get("route", "rag")
+    
+    if route == "database":
+        return "database_agent"
+    elif route == "web_search":
+        return "web_search_agent"
+    else:
+        return "rag_agent"
+
+
+# ============================================================================
+# Build Graph
+# ============================================================================
+
+def build_graph():
+    """Build the LangGraph workflow"""
+    workflow = StateGraph(AgentState)
+    
+    # Add nodes
+    workflow.add_node("route_question", route_question)
+    workflow.add_node("rag_agent", rag_agent)
+    workflow.add_node("database_agent", database_agent)
+    workflow.add_node("web_search_agent", web_search_agent)
+    
+    # Set entry point
+    workflow.set_entry_point("route_question")
+    
+    # Add conditional edges from router
+    workflow.add_conditional_edges(
+        "route_question",
+        route_to_agent,
+        {
+            "rag_agent": "rag_agent",
+            "database_agent": "database_agent",
+            "web_search_agent": "web_search_agent"
+        }
+    )
+    
+    # All agents end the workflow
+    workflow.add_edge("rag_agent", END)
+    workflow.add_edge("database_agent", END)
+    workflow.add_edge("web_search_agent", END)
+    
+    return workflow.compile()
+
+
+# Global graph instance
+_graph = None
+
+def get_graph():
+    """Get or create graph instance"""
+    global _graph
+    if _graph is None:
+        _graph = build_graph()
+    return _graph
+
+
+# ============================================================================
+# API Endpoints
+# ============================================================================
+
+class QuestionRequest(BaseModel):
+    question: str
 
 
 @app.post("/search")
-async def build_knowledge_base(payload: QuestionRequest):
+async def search_endpoint(payload: QuestionRequest):
     """
-    Route input to either RAG agent (Qdrant) or DB agent (MySQL CRUD) based on intent.
+    Main endpoint for agentic RAG system
+    Routes questions to appropriate agent (RAG, Database, or Web Search)
     """
-    user_text = payload.question if payload else ""
-    if not user_text:
-        return {"ok": False, "error": "Empty input"}
-
+    question = payload.question
+    
+    if not question:
+        return {"ok": False, "error": "Empty question"}
+    
     try:
-        route = await route_intent(user_text)
+        # Get graph
+        graph = get_graph()
         
-        if route == "DB":
-            answer = await query_db(user_text)
-        else:
-            answer = await query_rag(user_text)
+        # Initialize state
+        initial_state = {
+            "messages": [],
+            "question": question,
+            "route": "",
+            "context": "",
+            "answer": "",
+            "error": ""
+        }
         
-        return {"ok": True, "route": route, "answer": answer}
+        # Run graph with async support
+        result = await graph.ainvoke(initial_state)
+        
+        # Extract answer
+        answer = result.get("answer", "No answer generated")
+        route = result.get("route", "unknown")
+        error = result.get("error", "")
+        
+        if error:
+            return {
+                "ok": False,
+                "error": error,
+                "route": route,
+                "answer": answer
+            }
+        
+        return {
+            "ok": True,
+            "route": route,
+            "answer": answer
+        }
+        
     except Exception as e:
         import traceback
-        return {"ok": False, "error": str(e), "traceback": traceback.format_exc()}
-
+        return {
+            "ok": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
