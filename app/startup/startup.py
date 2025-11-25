@@ -1,6 +1,6 @@
-from RAG_QrandtDB.app.db.qdrant_service import QdrantService, Distance
+from app.db.qdrant_service import QdrantService, Distance
 
-from RAG_QrandtDB.app.core.config.config import (EMBEDDING_DIMS)
+from app.core.config.config import (EMBEDDING_DIMS)
 
 
 

@@ -3,28 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Numbering today's date</title>
+  <title>TRỢ LÝ ẢO SINH VIÊN</title>
   <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <div class="container">
-    <h1>STUDENT's VIRTUAL ASSITANT</h1>
-    <div class="chat-window">
-      <div class="message user-message">
-        <div class="avatar">BOT</div>
-        <div class="bubble">How can I help you today?</div>
+  <!-- Sidebar for chat history -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Chat History</h2>
+      <button class="close-sidebar" id="close-sidebar">✕</button>
+    </div>
+    <div class="sidebar-content">
+      <button class="new-chat-btn" id="new-chat">+ New Chat</button>
+      <div class="chat-history" id="chat-history">
+        <!-- Chat history items will be dynamically added here -->
       </div>
+    </div>
+  </div>
 
-      <div class="message bot-message">
-        <div class="avatar bot-avatar">AI</div>
-        <div class="bubble" id="bot-response"></div>
+  <!-- Overlay when sidebar is open -->
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Main content -->
+  <div class="main-content">
+    <!-- Header -->
+    <div class="header">
+      <button class="menu-button" id="menu-button">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <h1>TRỢ LÝ ẢO SINH VIÊN</h1>
+      <div class="header-spacer"></div>
+    </div>
+
+    <!-- Chat container -->
+    <div class="chat-container">
+      <div class="chat-window" id="chat-window">
+        <div class="message bot-message">
+          <div class="avatar bot-avatar">AI</div>
+          <div class="bubble">How can I help you today?</div>
+        </div>
       </div>
     </div>
 
-    <form id="chat-form" class="chat-form">
-      <input type="text" id="user-input" placeholder="How can I help you today?" autocomplete="off" required />
-      <button type="submit" class="send-button">↑</button>
-    </form>
+    <!-- Input form -->
+    <div class="input-container">
+      <form id="chat-form" class="chat-form">
+        <input type="text" id="user-input" placeholder="Ask me anything..." autocomplete="off" required />
+        <button type="submit" class="send-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </button>
+      </form>
+    </div>
   </div>
 
   <script src="script.js"></script>

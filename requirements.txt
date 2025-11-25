@@ -8,3 +8,6 @@ langchain_docling
 langchain_huggingface
 qdrant_client
 docling
+agentscope[full]
+google-generativeai
+mysql-connector-python

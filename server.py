@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.rag.rag_core import rag_core
+from app.rag.agentic import app as agentic_router
 import time
 from app.startup.startup import init_qdrant_service, get_qdrant_service
 
@@ -14,9 +14,9 @@ tags_metadata = [
 ]
 
 app = FastAPI(
-    title="RAG Basic API",
-    description="API for basic RAG operations",
-    version="1.0.0",
+    title="AGENTIC - RAG API",
+    description="agentic RAG API with Qdrant Vector Database",
+    version="2.0.0",
     openapi_tags=tags_metadata,
 )
 
@@ -28,8 +28,9 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers, adjust as needed
 )   
 
-app.include_router(rag_core, prefix="/rag_core", tags=["RAG Basic"])
+app.include_router(agentic_router, prefix="/api/generate", tags=["RAG Basic"])
 
+@app.on_event("startup")
 async def startup_event():
     """
     Startup event to initialize resources if needed.

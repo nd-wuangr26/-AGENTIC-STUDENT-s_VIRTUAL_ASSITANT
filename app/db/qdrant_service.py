@@ -2,8 +2,8 @@ from fastapi import HTTPException
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from RAG_QrandtDB.app.core.schenma.reponse_schenma import * 
-from RAG_QrandtDB.app.core.vector_strore.base_vectorDB import VectorStore
+from app.core.schenma.reponse_schenma import * 
+from app.core.vector_strore.base_vectorDB import VectorStore
 import uuid
 
 
@@ -50,7 +50,9 @@ class QdrantService(VectorStore):
         payload = {
             "doc_id": doc_request.doc_id,
             "content": doc_request.context,
-            "metadata": doc_request.metadata
+            "chunk_id": doc_request.chunk_id,
+            "total_chunks": doc_request.total_chunks,
+            # "metadata": doc_request.metadata
         }
         
         point = PointStruct(

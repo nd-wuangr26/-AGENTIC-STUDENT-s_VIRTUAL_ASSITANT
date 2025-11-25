@@ -4,9 +4,10 @@ from strenum import StrEnum
 
 class DocumentEbedingRequest(BaseModel):
     doc_id: str
-    embeding: List[float]
     context: str
-    metadata: Dict[str, Any]
+    embeding: List[float]
+    chunk_id: Optional[str] = "0"
+    total_chunks: Optional[int] = 1
 
 class RequestResult(BaseModel):
     request_id: str
@@ -58,3 +59,7 @@ class Message(BaseModel):
     
 class QueryPayload(BaseModel):
     data: List[Message]
+
+# Simple schema for frontend chat interface
+class QuestionRequest(BaseModel):
+    question: str
