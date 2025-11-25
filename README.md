@@ -243,10 +243,6 @@ MCPTool(
 
 MIT License
 
-## 👥 Contributors
-
-- Your Name
-
 ## 🙏 Acknowledgments
 
 - LangGraph by LangChain
