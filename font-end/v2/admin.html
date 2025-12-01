@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Quản lý KTX</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Admin Panel</h2>
+                <p id="adminUsername"></p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#overview" class="nav-item active" data-section="overview">
+                    <span class="icon">📊</span>
+                    Tổng quan
+                </a>
+                <a href="#buildings" class="nav-item" data-section="buildings">
+                    <span class="icon">🏢</span>
+                    Tòa nhà
+                </a>
+                <a href="#rooms" class="nav-item" data-section="rooms">
+                    <span class="icon">🚪</span>
+                    Phòng
+                </a>
+                <a href="#students" class="nav-item" data-section="students">
+                    <span class="icon">👥</span>
+                    Sinh viên
+                </a>
+                <a href="#upload" class="nav-item" data-section="upload">
+                    <span class="icon">📤</span>
+                    Upload tài liệu
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn-logout">Đăng xuất</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1 id="sectionTitle">Tổng quan</h1>
+                <button id="refreshBtn" class="btn-refresh">🔄 Làm mới</button>
+            </header>
+
+            <!-- Overview Section -->
+            <section id="overview-section" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🏢</div>
+                        <div class="stat-info">
+                            <h3 id="totalBuildings">-</h3>
+                            <p>Tòa nhà</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🚪</div>
+                        <div class="stat-info">
+                            <h3 id="totalRooms">-</h3>
+                            <p>Phòng</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-info">
+                            <h3 id="totalStudents">-</h3>
+                            <p>Sinh viên</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-info">
+                            <h3 id="occupancyRate">-</h3>
+                            <p>Tỷ lệ lấp đầy</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="buildings-overview" id="buildingsOverview">
+                    <!-- Buildings will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Buildings Section -->
+            <section id="buildings-section" class="content-section">
+                <div class="building-tabs">
+                    <button class="building-tab active" data-building="A">Tòa A</button>
+                    <button class="building-tab" data-building="B">Tòa B</button>
+                    <button class="building-tab" data-building="C">Tòa C</button>
+                    <button class="building-tab" data-building="D">Tòa D</button>
+                </div>
+
+                <div id="buildingDetails" class="building-details">
+                    <!-- Building details will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Rooms Section -->
+            <section id="rooms-section" class="content-section">
+                <div class="table-container">
+                    <table id="roomsTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Phòng</th>
+                                <th>Tòa</th>
+                                <th>Tầng</th>
+                                <th>Sức chứa</th>
+                                <th>Hiện tại</th>
+                                <th>Còn trống</th>
+                                <th>Tỷ lệ (%)</th>
+                                <th>Cập nhật</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rooms will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Students Section -->
+            <section id="students-section" class="content-section">
+                <div class="table-container">
+                    <table id="studentsTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>MSSV</th>
+                                <th>Họ tên</th>
+                                <th>Năm sinh</th>
+                                <th>Phòng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Students will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Upload Section -->
+            <section id="upload-section" class="content-section">
+                <div class="upload-container">
+                    <h2>Upload tài liệu vào Vector Database</h2>
+                    <p>Upload tài liệu để bổ sung thông tin vào hệ thống RAG</p>
+
+                    <form id="uploadForm" class="upload-form">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.txt" required>
+                            <label for="fileInput" class="file-label">
+                                <span class="icon">📁</span>
+                                <span id="fileName">Chọn file...</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn-upload" id="uploadBtn">
+                            <span class="icon">📤</span>
+                            Upload
+                        </button>
+                    </form>
+
+                    <div id="uploadStatus" class="upload-status"></div>
+                    <div id="uploadProgress" class="upload-progress"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>

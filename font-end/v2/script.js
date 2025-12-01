@@ -1,35 +1,98 @@
-// Chat history management
-let chatHistory = [];
-let currentChatId = null;
+// Authentication check
+function checkUserAuth() {
+  const token = localStorage.getItem('access_token');
+  const role = localStorage.getItem('role');
 
-// Load chat history from localStorage
-function loadChatHistory() {
-  const saved = localStorage.getItem('chatHistory');
-  if (saved) {
-    chatHistory = JSON.parse(saved);
-    renderChatHistory();
+  if (!token) {
+    window.location.href = 'login.html';
+    return false;
+  }
+
+  // If admin, redirect to admin dashboard
+  if (role === 'admin') {
+    window.location.href = 'admin.html';
+    return false;
+  }
+
+  return true;
+}
+
+// Display username
+function displayUserInfo() {
+  const username = localStorage.getItem('username');
+  if (username) {
+    document.getElementById('username-display').textContent = username;
   }
 }
 
-// Save chat history to localStorage
-function saveChatHistory() {
-  localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+// Logout function
+function logout() {
+  localStorage.clear();
+  window.location.href = 'login.html';
 }
 
-// Create new chat
-function createNewChat() {
-  const chatId = Date.now().toString();
-  const newChat = {
-    id: chatId,
-    title: 'New Chat',
-    messages: [],
-    timestamp: new Date().toISOString()
+// Check auth on page load
+if (!checkUserAuth()) {
+  // Will redirect, so stop execution
+  throw new Error('Not authenticated');
+}
+
+// API configuration
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('access_token');
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
   };
-  chatHistory.unshift(newChat);
-  currentChatId = chatId;
-  saveChatHistory();
-  renderChatHistory();
-  clearChatWindow();
+}
+
+// Chat history management with database
+let currentSessionId = null;
+
+// Load chat history from database
+async function loadChatHistory() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+      headers: getAuthHeaders()
+    });
+
+    if (response.ok) {
+      const sessions = await response.json();
+      renderChatHistory(sessions);
+
+      // Load first session or create new one
+      if (sessions.length > 0) {
+        currentSessionId = sessions[0].session_id;
+        await loadSession(currentSessionId);
+      } else {
+        await createNewChat();
+      }
+    }
+  } catch (error) {
+    console.error('Error loading chat history:', error);
+  }
+}
+
+// Create new chat session
+async function createNewChat() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title: 'New Chat' })
+    });
+
+    if (response.ok) {
+      const newSession = await response.json();
+      currentSessionId = newSession.session_id;
+      await loadChatHistory();
+      clearChatWindow();
+    }
+  } catch (error) {
+    console.error('Error creating new chat:', error);
+  }
 }
 
 // Clear chat window
@@ -44,28 +107,42 @@ function clearChatWindow() {
 }
 
 // Render chat history in sidebar
-function renderChatHistory() {
+function renderChatHistory(sessions) {
   const historyContainer = document.getElementById('chat-history');
   historyContainer.innerHTML = '';
 
-  chatHistory.forEach(chat => {
+  sessions.forEach(session => {
     const item = document.createElement('div');
     item.className = 'history-item';
-    if (chat.id === currentChatId) {
+    item.setAttribute('data-session-id', session.session_id);
+    if (session.session_id === currentSessionId) {
       item.classList.add('active');
     }
 
-    const date = new Date(chat.timestamp);
+    const date = new Date(session.updated_at);
     const timeStr = formatTime(date);
 
     item.innerHTML = `
-      <div class="history-item-title">${chat.title}</div>
-      <div class="history-item-time">${timeStr}</div>
+      <div class="history-item-content">
+        <div class="history-item-title">${session.title}</div>
+        <div class="history-item-time">${timeStr}</div>
+      </div>
+      <button class="delete-session-btn" data-session-id="${session.session_id}" title="Delete">
+        🗑️
+      </button>
     `;
 
-    item.addEventListener('click', () => {
-      loadChat(chat.id);
+    item.querySelector('.history-item-content').addEventListener('click', async () => {
+      await loadSession(session.session_id);
       closeSidebar();
+    });
+
+    // Delete button handler
+    item.querySelector('.delete-session-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm('Delete this chat?')) {
+        await deleteSession(session.session_id);
+      }
     });
 
     historyContainer.appendChild(item);
@@ -87,47 +164,150 @@ function formatTime(date) {
   return date.toLocaleDateString();
 }
 
-// Load specific chat
-function loadChat(chatId) {
-  const chat = chatHistory.find(c => c.id === chatId);
-  if (!chat) return;
+// Load specific session
+async function loadSession(sessionId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+      headers: getAuthHeaders()
+    });
 
-  currentChatId = chatId;
-  const chatWindow = document.getElementById('chat-window');
-  chatWindow.innerHTML = '';
+    if (response.ok) {
+      const sessionData = await response.json();
+      currentSessionId = sessionId;
 
-  chat.messages.forEach(msg => {
-    const messageEl = document.createElement('div');
-    messageEl.className = `message ${msg.type}-message`;
-    messageEl.innerHTML = `
-      <div class="avatar ${msg.type === 'bot' ? 'bot-avatar' : ''}">${msg.type === 'bot' ? 'AI' : 'ND'}</div>
-      <div class="bubble">${msg.content}</div>
-    `;
-    chatWindow.appendChild(messageEl);
-  });
+      const chatWindow = document.getElementById('chat-window');
+      chatWindow.innerHTML = '';
 
-  chatWindow.scrollTop = chatWindow.scrollHeight;
-  renderChatHistory();
+      sessionData.messages.forEach(msg => {
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${msg.role === 'user' ? 'user' : 'bot'}-message`;
+        messageEl.innerHTML = `
+          <div class="avatar ${msg.role === 'assistant' ? 'bot-avatar' : ''}">${msg.role === 'assistant' ? 'AI' : 'ND'}</div>
+          <div class="bubble">${msg.content}</div>
+        `;
+        chatWindow.appendChild(messageEl);
+      });
+
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+
+      // Update sidebar active state only
+      document.querySelectorAll('.history-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      const activeItem = document.querySelector(`[data-session-id="${sessionId}"]`)?.closest('.history-item');
+      if (activeItem) {
+        activeItem.classList.add('active');
+      }
+    }
+  } catch (error) {
+    console.error('Error loading session:', error);
+  }
 }
 
-// Save message to current chat
-function saveMessage(type, content) {
-  if (!currentChatId) {
-    createNewChat();
+// Save message to database
+async function saveMessage(role, content) {
+  if (!currentSessionId) {
+    await createNewChat();
   }
 
-  const chat = chatHistory.find(c => c.id === currentChatId);
-  if (!chat) return;
+  try {
+    await fetch(`${API_BASE_URL}/chat/messages`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        session_id: currentSessionId,
+        role: role,
+        content: content
+      })
+    });
 
-  chat.messages.push({ type, content, timestamp: new Date().toISOString() });
+    // Update session title based on first user message
+    if (role === 'user') {
+      const sessions = await (await fetch(`${API_BASE_URL}/chat/sessions`, {
+        headers: getAuthHeaders()
+      })).json();
 
-  // Update chat title based on first user message
-  if (type === 'user' && chat.messages.filter(m => m.type === 'user').length === 1) {
-    chat.title = content.substring(0, 30) + (content.length > 30 ? '...' : '');
+      const currentSession = sessions.find(s => s.session_id === currentSessionId);
+      if (currentSession && currentSession.message_count <= 1) {
+        const title = content.substring(0, 30) + (content.length > 30 ? '...' : '');
+        await updateSessionTitle(currentSessionId, title);
+
+        // Only refresh sidebar after title update
+        await refreshSidebar();
+      }
+    }
+  } catch (error) {
+    console.error('Error saving message:', error);
+  }
+}
+
+// Refresh sidebar only (không load lại session)
+async function refreshSidebar() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+      headers: getAuthHeaders()
+    });
+
+    if (response.ok) {
+      const sessions = await response.json();
+      renderChatHistory(sessions);
+    }
+  } catch (error) {
+    console.error('Error refreshing sidebar:', error);
+  }
+}
+
+// Update session title
+async function updateSessionTitle(sessionId, title) {
+  try {
+    await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/title?title=${encodeURIComponent(title)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+  } catch (error) {
+    console.error('Error updating title:', error);
+  }
+}
+
+// Delete session
+async function deleteSession(sessionId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    if (response.ok) {
+      // If deleting current session, create new one
+      if (sessionId === currentSessionId) {
+        await createNewChat();
+      } else {
+        await loadChatHistory();
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting session:', error);
+  }
+}
+
+// Delete all sessions
+async function deleteAllSessions() {
+  if (!confirm('Delete all chat history? This cannot be undone.')) {
+    return;
   }
 
-  saveChatHistory();
-  renderChatHistory();
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat/sessions`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    if (response.ok) {
+      await createNewChat();
+    }
+  } catch (error) {
+    console.error('Error deleting all sessions:', error);
+  }
 }
 
 // Typing effect
@@ -180,7 +360,7 @@ function closeSidebar() {
 }
 
 // Initialize
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   const form = document.getElementById("chat-form");
   const input = document.getElementById("user-input");
   const chatWindow = document.getElementById("chat-window");
@@ -188,24 +368,23 @@ document.addEventListener("DOMContentLoaded", function () {
   const closeSidebarBtn = document.getElementById("close-sidebar");
   const overlay = document.getElementById("overlay");
   const newChatBtn = document.getElementById("new-chat");
+  const logoutBtn = document.getElementById("logout-btn");
 
-  // Load chat history
-  loadChatHistory();
+  // Display user info
+  displayUserInfo();
 
-  // If no chat exists, create one
-  if (chatHistory.length === 0) {
-    createNewChat();
-  } else {
-    currentChatId = chatHistory[0].id;
-    loadChat(currentChatId);
-  }
+  // Logout handler
+  logoutBtn.addEventListener("click", logout);
+
+  // Load chat history from database
+  await loadChatHistory();
 
   // Sidebar controls
   menuButton.addEventListener("click", openSidebar);
   closeSidebarBtn.addEventListener("click", closeSidebar);
   overlay.addEventListener("click", closeSidebar);
-  newChatBtn.addEventListener("click", () => {
-    createNewChat();
+  newChatBtn.addEventListener("click", async () => {
+    await createNewChat();
     closeSidebar();
   });
 
@@ -224,8 +403,8 @@ document.addEventListener("DOMContentLoaded", function () {
     `;
     chatWindow.appendChild(userMessageEl);
 
-    // Save user message
-    saveMessage('user', userInput);
+    // Save user message to database
+    await saveMessage('user', userInput);
 
     // Show typing indicator
     const typingEl = showTypingIndicator();
@@ -281,8 +460,8 @@ document.addEventListener("DOMContentLoaded", function () {
       // Type effect
       await typeEffect(botBubble, answerText);
 
-      // Save bot message
-      saveMessage('bot', answerText);
+      // Save bot message to database
+      await saveMessage('assistant', answerText);
 
     } catch (error) {
       // Remove typing indicator if still present
@@ -304,7 +483,7 @@ document.addEventListener("DOMContentLoaded", function () {
       chatWindow.appendChild(botMessageEl);
 
       await typeEffect(botBubble, errorMessage);
-      saveMessage('bot', errorMessage);
+      await saveMessage('assistant', errorMessage);
 
       console.error("Error fetching API:", error);
     }
