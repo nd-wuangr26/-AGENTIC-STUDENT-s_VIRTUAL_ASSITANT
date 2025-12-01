@@ -1,251 +1,200 @@
-# Agentic RAG System with LangGraph
+# 🎓 Agentic RAG System for Dormitory Management
 
-## 🚀 Features
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)
+![LangGraph](https://img.shields.io/badge/LangGraph-0.0.1-orange.svg)
+![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-red.svg)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)
 
-- **Multi-Agent Architecture**: Sử dụng LangGraph để xây dựng hệ thống multi-agent
-- **Intelligent Routing**: Tự động phân loại và định tuyến câu hỏi đến agent phù hợp
-- **RAG Agent**: Truy vấn knowledge base từ Qdrant vector database
-- **Database Agent**: Quản lý ký túc xá với MySQL thông qua MCP (Model Context Protocol)
-- **Web Search Agent**: Tìm kiếm thông tin real-time trên web
-- **Modern UI**: Giao diện web hiện đại với chat history và sliding sidebar
+Hệ thống **Agentic RAG** thông minh dành cho quản lý ký túc xá, tích hợp kiến trúc Multi-Agent với LangGraph, cơ sở dữ liệu Vector Qdrant và MySQL. Hệ thống cung cấp khả năng trả lời câu hỏi tự động, quản lý sinh viên/phòng ở, và tìm kiếm thông tin thời gian thực.
 
-## 🏗️ Architecture
+---
 
+## 🚀 Tính Năng Nổi Bật (Key Features)
+
+### 🧠 1. Kiến Trúc Multi-Agent (AI Core)
+Hệ thống sử dụng **LangGraph** để điều phối các agent chuyên biệt:
+- **Router Agent**: Phân tích ý định người dùng (Intent Classification) để định tuyến câu hỏi đến agent phù hợp.
+- **RAG Agent**: Truy vấn tài liệu quy chế, hướng dẫn từ **Qdrant Vector DB** để trả lời các câu hỏi chung.
+- **Database Agent**: Tương tác trực tiếp với **MySQL** để tra cứu thông tin phòng, sinh viên, điện nước (sử dụng MCP - Model Context Protocol).
+- **Web Search Agent**: Tìm kiếm thông tin thời gian thực (tin tức, thời tiết) qua **Google Search (Serper API)**.
+
+### 🔐 2. Xác Thực & Phân Quyền (Authentication)
+- **JWT Authentication**: Bảo mật đăng nhập và phiên làm việc.
+- **User Roles**:
+  - **Student (User)**: Đăng ký bằng MSSV, chat với bot, xem lịch sử chat.
+  - **Admin**: Quyền quản trị cao cấp, truy cập Dashboard.
+
+### 📊 3. Admin Dashboard
+Giao diện quản trị dành riêng cho Admin:
+- **Thống kê tổng quan**: Số lượng tòa nhà, phòng, sinh viên, tỉ lệ lấp đầy.
+- **Quản lý phòng**: Xem trạng thái từng phòng (trống/đầy), số lượng sinh viên hiện tại.
+- **Thống kê theo tòa**: Chi tiết cho các tòa A, B, C, D.
+- **Quản lý sinh viên**: Danh sách toàn bộ sinh viên.
+- **Document Management**: **Upload tài liệu** trực tiếp để hệ thống tự động chunking và vector hóa vào Qdrant.
+
+### 💬 4. Chat History & Session Management
+- **Lưu trữ lịch sử**: Tự động lưu toàn bộ hội thoại vào MySQL.
+- **Quản lý phiên chat**: Tạo mới, đổi tên, xóa phiên chat.
+- **Context Awareness**: Bot ghi nhớ ngữ cảnh trong phiên làm việc.
+
+---
+
+## 🏗️ Kiến Trúc Hệ Thống (Architecture)
+
+```mermaid
+graph TD
+    User[User Question] --> Router[Router Agent]
+    Router -->|General Info| RAG[RAG Agent]
+    Router -->|Dorm Data| DB[Database Agent]
+    Router -->|Real-time| Web[Web Search Agent]
+    
+    RAG -->|Query| Qdrant[(Qdrant Vector DB)]
+    DB -->|SQL| MySQL[(MySQL Database)]
+    Web -->|API| Serper[Google Serper API]
+    
+    Subgraph Backend
+        FastAPI Server
+        Auth Middleware
+        Admin API
+    End
 ```
-┌─────────────────────────────────────────────┐
-│           User Question                      │
-└──────────────────┬──────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────┐
-│     Router Agent (LLM Classification)        │
-│  - Phân tích intent của câu hỏi             │
-│  - Route đến agent phù hợp                  │
-└──────────┬──────────┬──────────┬────────────┘
-           │          │          │
-    ┌──────┴───┐  ┌──┴────┐  ┌──┴─────────┐
-    │   RAG    │  │  DB   │  │ Web Search │
-    │  Agent   │  │ Agent │  │   Agent    │
-    └────┬─────┘  └───┬───┘  └─────┬──────┘
-         │            │             │
-    ┌────┴─────┐ ┌───┴────┐   ┌────┴─────┐
-    │ Qdrant   │ │ MySQL  │   │  Serper  │
-    │ Vector   │ │  MCP   │   │  Google  │
-    │   DB     │ │ Server │   │  Search  │
-    └──────────┘ └────────┘   └──────────┘
-```
-![alt text](image.png)
-## 📋 Prerequisites
 
-- Python 3.11+
-- MySQL Server
-- Qdrant Vector Database
-- OpenAI API Key
-- Serper API Key
+---
 
-## 🔧 Installation
+## 🛠️ Yêu Cầu Hệ Thống (Prerequisites)
 
-1. **Clone repository và cài đặt dependencies**:
+- **Python**: 3.11 trở lên
+- **MySQL Server**: 8.0+
+- **Docker**: Để chạy Qdrant (khuyến nghị)
+- **API Keys**:
+  - OpenAI API Key (cho LLM & Embeddings)
+  - Serper API Key (cho Web Search)
+
+---
+
+## ⚙️ Cài Đặt & Thiết Lập (Installation)
+
+### 1. Clone Repository
 ```bash
-cd /home/quang/My_Project/DATN_v2/RAG_QrandtDB
+git clone <repository-url>
+cd RAG_QrandtDB
+```
+
+### 2. Cài Đặt Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-2. **Cấu hình environment variables**:
+### 3. Cấu Hình Môi Trường (.env)
+Tạo file `.env` từ `.env.example` và điền thông tin:
 ```bash
-cp .env
-# Edit .env với các API keys và database credentials
+cp .env.example .env
+```
+Nội dung file `.env` cần có:
+```env
+# Database Config
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DB=dormitory_db
+
+# Qdrant Config
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=your_qdrant_key (nếu có)
+
+# API Keys
+OPENAI_API_KEY=sk-...
+SERPER_API_KEY=...
+
+# JWT Config
+SECRET_KEY=your_secret_key_hash
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-3. **Khởi động Qdrant** (nếu chưa chạy):
+### 4. Khởi Chạy Database
+**Qdrant (Vector DB):**
 ```bash
-docker run -p 6333:6333 qdrant/qdrant
+docker run -d -p 6333:6333 qdrant/qdrant
 ```
 
-4. **Setup MySQL database**:
+**MySQL (Relational DB):**
+Tạo database và bảng từ file SQL:
 ```bash
 mysql -u root -p < init_database.sql
 ```
 
-## 🚀 Usage
+### 5. Tạo Tài Khoản Admin
+Chạy script để tạo tài khoản admin đầu tiên:
+```bash
+python create_admin.py
+# Nhập username và password khi được hỏi
+```
 
-### Start Backend Server
+---
 
+## 🚀 Hướng Dẫn Sử Dụng (Usage)
+
+### 1. Khởi Chạy Backend Server
 ```bash
 uvicorn server:app --reload --host 127.0.0.1 --port 8000
 ```
+Server sẽ chạy tại: `http://127.0.0.1:8000`
+Swagger UI (API Docs): `http://127.0.0.1:8000/docs`
 
-### Start Frontend
+### 2. Khởi Chạy Frontend
+Mở file `font-end/v2/index.html` trực tiếp trên trình duyệt hoặc sử dụng Live Server của VS Code.
 
-Mở file `font-end/v2/index.html` trong browser hoặc sử dụng live server.
+---
 
-### API Endpoint
+## 📚 API Documentation
 
-**POST** `/api/generate/search`
+### 🔐 Authentication (`/api/auth`)
+- `POST /login`: Đăng nhập (trả về JWT Token).
+- `POST /register`: Đăng ký tài khoản sinh viên (Username = MSSV).
+- `GET /me`: Lấy thông tin user hiện tại.
 
-Request:
-```json
-{
-  "question": "Có phòng nào còn trống không?"
-}
-```
+### 🤖 RAG Generation (`/api/generate`)
+- `POST /search`: Gửi câu hỏi cho hệ thống Agentic RAG xử lý.
 
-Response:
-```json
-{
-  "ok": true,
-  "route": "database",
-  "answer": "Hiện tại có 5 phòng còn trống..."
-}
-```
+### 💬 Chat History (`/api/chat`)
+- `GET /sessions`: Lấy danh sách phiên chat.
+- `POST /sessions`: Tạo phiên chat mới.
+- `GET /sessions/{id}`: Lấy nội dung tin nhắn của phiên.
+- `POST /messages`: Lưu tin nhắn mới.
 
-## 🧩 MCP (Model Context Protocol)
+### 🛡️ Admin Dashboard (`/api/admin`)
+- `GET /overview`: Thống kê toàn bộ hệ thống.
+- `GET /buildings/{id}`: Thống kê chi tiết tòa nhà.
+- `GET /rooms`: Trạng thái phòng ở.
+- `POST /upload`: **Upload tài liệu** (PDF/Doc) để training cho bot.
 
-Hệ thống sử dụng MCP pattern để chuẩn hóa interface với MySQL:
+---
 
-### MCP Resources
-- `mysql://dormitory/rooms` - Database phòng ký túc xá
-- `mysql://dormitory/students` - Database sinh viên
-
-### MCP Tools
-- `list_available_rooms()` - Liệt kê phòng trống
-- `add_student(mssv, ten, nam_sinh, room_id)` - Thêm sinh viên
-- `get_student_info(mssv)` - Lấy thông tin sinh viên
-- `get_room_info(room_id)` - Lấy thông tin phòng
-- `remove_student(mssv)` - Xóa sinh viên
-
-## 🔍 Agent Types
-
-### 1. RAG Agent
-- Truy vấn knowledge base từ Qdrant
-- Sử dụng OpenAI embeddings (text-embedding-3-small)
-- Retrieve top-k relevant documents
-- Generate answer với context
-
-### 2. Database Agent
-- Kết nối MySQL qua MCP server
-- CRUD operations cho dormitory management
-- Tool-based execution với LangChain
-
-### 3. Web Search Agent
-- Tìm kiếm real-time information
-- Sử dụng Google Search qua Serper API
-- Synthesize search results với độ chính xác cao
-
-## 📁 Project Structure
+## 📂 Cấu Trúc Dự Án (Project Structure)
 
 ```
-
-│── app/
-│   ├── core/
-│   │   ├── mcp/
-│   │   │   └── mysql_mcp_server.py    # MCP Server implementation
-│   │   ├── CRUD_Mysql/
-│   │   │   └── base_mysql.py          # Legacy MySQL tools
-│   │   ├── config/
-│   │   │   └── config.py              # Configuration
-│   │   └── ...
-│   ├── rag/
-│   │   └── agentic.py                 # LangGraph agents
-│   └── startup/
-│       └── startup.py                 # Initialization
-├── font-end/
-│   └── v2/
-│       ├── index.html                 # Modern UI
-│       ├── styles.css                 # Styling
-│       └── script.js                  # Frontend logic
-├── server.py                          # FastAPI server
-├── requirements.txt                   # Dependencies
-└── .env                               # Environment
+RAG_QrandtDB/
+├── app/
+│   ├── api/                 # API Routes (Auth, Admin, Chat, RAG)
+│   ├── core/                # Core Logic (Config, Schema, Services)
+│   ├── rag/                 # RAG Logic (LangGraph Agents)
+│   └── startup/             # Startup Events (DB Init)
+├── document/                # Thư mục chứa tài liệu upload
+├── font-end/                # Frontend Source Code
+│   └── v2/                  # Version 2 UI (Recommended)
+├── create_admin.py          # Script tạo admin
+├── init_database.sql        # Script khởi tạo MySQL
+├── server.py                # Main Entry Point
+├── requirements.txt         # Python Dependencies
+└── README.md                # Documentation
 ```
 
-## 🎯 Example Queries
+---
 
-### RAG Queries
-- "Kinh tế công nghiệp là gì?"
-- "Giải thích về phát triển bền vững"
-
-### Database Queries
-- "Có phòng nào còn trống không?"
-- "Thêm sinh viên Nguyễn Văn A, MSSV 2021001, năm sinh 2003 vào phòng A101"
-- "Cho tôi biết thông tin sinh viên có MSSV 2021001"
-- "Phòng B201 có bao nhiêu sinh viên?"
-
-### Web Search Queries
-- "Tin tức mới nhất về AI"
-- "Thời tiết hôm nay"
-- "Giá Bitcoin hiện tại"
-
-## 🔄 Extending the System
-
-### Add New Agent
-
-1. Define agent function:
-```python
-def new_agent(state: AgentState) -> AgentState:
-    # Your agent logic
-    return state
-```
-
-2. Add to graph:
-```python
-workflow.add_node("new_agent", new_agent)
-```
-
-3. Update router:
-```python
-def route_to_agent(state: AgentState):
-    if condition:
-        return "new_agent"
-```
-
-### Add New MCP Tool
-
-1. Add tool to `mysql_mcp_server.py`:
-```python
-def new_tool(self, param: str) -> Dict[str, Any]:
-    # Tool implementation
-    pass
-```
-
-2. Register in `list_tools()`:
-```python
-MCPTool(
-    name="new_tool",
-    description="...",
-    inputSchema={...}
-)
-```
-
-3. Add to `call_tool()` mapping
-
-## 📊 Monitoring
-
-- Backend logs: Check uvicorn console
-- Frontend: Browser console (F12)
-- Database: MySQL logs
-
-## 🐛 Troubleshooting
-
-### "No response from server"
-- Check if backend is running on port 8000
-- Verify CORS settings in `server.py`
-
-### "MySQL connection failed"
-- Check `.env` MySQL credentials
-- Ensure MySQL server is running
-- Verify database exists
-
-### "Qdrant connection failed"
-- Start Qdrant: `docker run -p 6333:6333 qdrant/qdrant`
-- Check QDRANT_URL in `.env`
+## 🤝 Contributing
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## 📝 License
-
-MIT License
-
-## 🙏 Acknowledgments
-
-- LangGraph by LangChain
-- OpenAI for embeddings and LLM
-- Qdrant for vector database
-- Serper for Google Search API
+[MIT](https://choosealicense.com/licenses/mit/)
