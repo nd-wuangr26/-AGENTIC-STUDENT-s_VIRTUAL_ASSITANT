@@ -196,13 +196,6 @@ RAG_QrandtDB/
 
 ---
 
-## 🤝 Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-## 📝 License
-<<<<<<< HEAD
-
-MIT License
 
 ## 🙏 Acknowledgments
 
@@ -210,6 +203,3 @@ MIT License
 - OpenAI for embeddings and LLM
 - Qdrant for vector database
 - Serper for Google Search API
-=======
-[MIT](https://choosealicense.com/licenses/mit/)
->>>>>>> develop
