@@ -1,0 +1,102 @@
+<svg viewBox="0 0 720 420" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+
+  <!-- Background -->
+  <rect width="720" height="420" fill="#0d1117" rx="12"/>
+
+  <!-- Title -->
+  <text x="36" y="38" font-size="15" font-weight="600" fill="#e6edf3">📊 Evaluation Metrics — Agentic RAG System</text>
+  <text x="36" y="56" font-size="11" fill="#7d8590">150 Q&amp;A pairs · 50 internal documents · RAGAS framework</text>
+
+  <!-- Divider -->
+  <line x1="36" y1="68" x2="684" y2="68" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Section: RAG Metrics -->
+  <text x="36" y="90" font-size="11" font-weight="600" fill="#58a6ff">RAG PIPELINE</text>
+
+  <!-- Bar track background helper -->
+  <!-- Faithfulness 0.87 -->
+  <text x="36" y="114" font-size="12" fill="#c9d1d9">Faithfulness</text>
+  <rect x="200" y="103" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="103" width="330.6" height="14" rx="3" fill="#238636"/>
+  <text x="588" y="115" font-size="12" font-weight="600" fill="#3fb950">0.87</text>
+  <text x="636" y="115" font-size="10" fill="#7d8590">▲ +0.07</text>
+
+  <!-- Answer Relevancy 0.84 -->
+  <text x="36" y="138" font-size="12" fill="#c9d1d9">Answer Relevancy</text>
+  <rect x="200" y="127" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="127" width="319.2" height="14" rx="3" fill="#238636"/>
+  <text x="588" y="139" font-size="12" font-weight="600" fill="#3fb950">0.84</text>
+  <text x="636" y="139" font-size="10" fill="#7d8590">▲ +0.06</text>
+
+  <!-- Context Precision 0.81 -->
+  <text x="36" y="162" font-size="12" fill="#c9d1d9">Context Precision</text>
+  <rect x="200" y="151" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="151" width="307.8" height="14" rx="3" fill="#1f6feb"/>
+  <text x="588" y="163" font-size="12" font-weight="600" fill="#58a6ff">0.81</text>
+  <text x="636" y="163" font-size="10" fill="#7d8590">▲ +0.06</text>
+
+  <!-- Context Recall 0.79 -->
+  <text x="36" y="186" font-size="12" fill="#c9d1d9">Context Recall</text>
+  <rect x="200" y="175" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="175" width="300.2" height="14" rx="3" fill="#1f6feb"/>
+  <text x="588" y="187" font-size="12" font-weight="600" fill="#58a6ff">0.79</text>
+  <text x="636" y="187" font-size="10" fill="#7d8590">▲ +0.07</text>
+
+  <!-- Answer Accuracy 84.7% -->
+  <text x="36" y="210" font-size="12" fill="#c9d1d9">Answer Accuracy</text>
+  <rect x="200" y="199" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="199" width="321.9" height="14" rx="3" fill="#9e6a03"/>
+  <text x="588" y="211" font-size="12" font-weight="600" fill="#d29922">84.7%</text>
+  <text x="636" y="211" font-size="10" fill="#7d8590">▲ +6.7%</text>
+
+  <!-- Hallucination Rate 8.3% (lower is better) -->
+  <text x="36" y="234" font-size="12" fill="#c9d1d9">Hallucination ↓</text>
+  <rect x="200" y="223" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="223" width="31.5" height="14" rx="3" fill="#da3633"/>
+  <text x="588" y="235" font-size="12" font-weight="600" fill="#f85149">8.3%</text>
+  <text x="636" y="235" font-size="10" fill="#3fb950">▼ −14%</text>
+
+  <!-- Benchmark baseline markers -->
+  <line x1="504" y1="96" x2="504" y2="242" stroke="#6e7681" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="506" y="94" font-size="9" fill="#6e7681">baseline avg</text>
+
+  <!-- Divider -->
+  <line x1="36" y1="260" x2="684" y2="260" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Section: Router Agent -->
+  <text x="36" y="280" font-size="11" font-weight="600" fill="#58a6ff">ROUTER AGENT — INTENT CLASSIFICATION</text>
+
+  <text x="36" y="304" font-size="12" fill="#c9d1d9">Routing Accuracy</text>
+  <rect x="200" y="293" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="293" width="346.9" height="14" rx="3" fill="#8957e5"/>
+  <text x="588" y="305" font-size="12" font-weight="600" fill="#a371f7">91.3%</text>
+
+  <text x="36" y="328" font-size="12" fill="#c9d1d9">Macro F1-Score</text>
+  <rect x="200" y="317" width="380" height="14" rx="3" fill="#21262d"/>
+  <rect x="200" y="317" width="338.2" height="14" rx="3" fill="#8957e5"/>
+  <text x="588" y="329" font-size="12" font-weight="600" fill="#a371f7">0.89</text>
+
+  <!-- Divider -->
+  <line x1="36" y1="350" x2="684" y2="350" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Footer stats -->
+  <text x="36" y="372" font-size="11" fill="#7d8590">Task Completion</text>
+  <text x="36" y="388" font-size="14" font-weight="600" fill="#e6edf3">88.5%</text>
+
+  <text x="186" y="372" font-size="11" fill="#7d8590">Avg Response Time</text>
+  <text x="186" y="388" font-size="14" font-weight="600" fill="#e6edf3">~1.8s</text>
+
+  <text x="336" y="372" font-size="11" fill="#7d8590">API Uptime (72h)</text>
+  <text x="336" y="388" font-size="14" font-weight="600" fill="#3fb950">99.1%</text>
+
+  <text x="486" y="372" font-size="11" fill="#7d8590">Concurrent Users</text>
+  <text x="486" y="388" font-size="14" font-weight="600" fill="#e6edf3">~50</text>
+
+  <text x="600" y="372" font-size="11" fill="#7d8590">Doc Chunks</text>
+  <text x="600" y="388" font-size="14" font-weight="600" fill="#e6edf3">~500</text>
+
+  <!-- Bottom border line -->
+  <line x1="36" y1="400" x2="684" y2="400" stroke="#30363d" stroke-width="1"/>
+  <text x="36" y="414" font-size="10" fill="#6e7681">▲ delta vs. no-RAG GPT-4 baseline · 200-sample router test · locust stress test single FastAPI instance</text>
+
+</svg>
